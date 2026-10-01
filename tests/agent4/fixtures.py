@@ -94,7 +94,7 @@ def minimal_agent2_model_dict(antimony_text: str, **overrides) -> dict:
     """The smallest valid ``agent2_model`` dict -- callers override ``species``/``parameters``/
     etc. to describe the specific synthetic model they built."""
     base = {
-        "contract_version": "agent2-agent3-to-agent4-v1",
+        "contract_version": "agent2-downstream-v1",
         "model_id": "test-model-1",
         "network_id": "test-network-1",
         "antimony_text": antimony_text,

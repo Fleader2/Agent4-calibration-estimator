@@ -1,4 +1,4 @@
-# Agent 2/Agent 3 → Agent 4 Contract (`agent2-agent3-to-agent4-v1`)
+# Agent 2/Agent 3 → Agent 4 Contract
 
 This is the smallest stable input shape Agent 4 Version 1 requires, expressed as a plain,
 JSON-serializable dict with two top-level keys: `agent2_model` and `agent3_diagnostics`.
@@ -6,6 +6,14 @@ JSON-serializable dict with two top-level keys: `agent2_model` and `agent3_diagn
 dataclass family in `app.agent4.handoff`. Agent 4 never imports Agent 2's or Agent 3's Python
 package — this mirrors the established decoupling pattern at every other boundary in this
 project.
+
+**Five-Agent Workflow V1 Hardening increment:** `agent2_model.contract_version` was previously
+expected to be `"agent2-agent3-to-agent4-v1"` — a name this repository invented independently of
+Agent 3's own `"agent2-to-agent3-v1"`, even though both described the identical real artifact
+shape. It is now `"agent2-downstream-v1"` (`AGENT4_HANDOFF_CONTRACT_VERSION`), the one canonical
+name Agent 2's own `AGENT2_DOWNSTREAM_CONTRACT_VERSION` emits and Agents 3, 4, and 5 all consume
+unchanged. The `agent2_model` shape itself is unchanged by this rename; `agent3_diagnostics`'s
+own shape and the overall two-key wrapping are also unchanged.
 
 ## Why two dicts, not one
 
@@ -75,21 +83,24 @@ logic itself.
 
 ## How the real `sce00061` fixture for this repository was built
 
-`tests/fixtures/sce00061_agent4_handoff.json` was assembled, in this session, by combining:
+**Five-Agent Workflow V1 Hardening increment:** `tests/fixtures/sce00061_agent4_handoff.json`
+is now assembled from Agent 2's own canonical `run_agent2_pipeline` entrypoint output directly
+(`agent2-antimony-builder`'s `app.agent2.pipeline`), run live against a fresh real Agent 1
+curation of the `sce00061` network — 53 species, 38 reactions, **115** parameters (the canonical
+pipeline's own reaction-context-resolution and enzyme-concentration/enzyme-state-dynamics
+stages, not exercised by the pre-hardening partial pipeline, legitimately declare more
+parameters than the earlier 109-parameter artifact did). `lower_bound`/`upper_bound`/`fixed` are
+already real fields on this canonical artifact (Agent 2's own `ParameterSpecification` type
+always carried them); **confirmed, with this real data, that all 115 parameters still have
+`lower_bound=upper_bound=fixed=None`** — no increment in the pipeline populates these fields
+yet. This is an honest, disclosed characteristic of the current model, not a fixture-building
+error.
 
-1. The sibling Agent 3 repository's own real `tests/fixtures/sce00061_agent2_handoff.json`
-   (already-validated real Agent 2 output for the current `sce00061` model: 53 species, 38
-   reactions, 109 parameters).
-2. A real extract of Agent 2's own `lower_bound`/`upper_bound`/`fixed`/`initialization_source`
-   fields for that same model, taken from an already-saved pilot artifact
-   (`agent1-biochemical-curator/artifacts/pilots/.../25_parameter_declaration.json` and
-   `45_full_reactions_and_species.json`) — **confirmed, with real data, that all 109 parameters
-   have `lower_bound=upper_bound=fixed=None` and all 53 species have
-   `initialization_source=None`** for the current model: no increment in the pipeline populates
-   these fields yet. This is an honest, disclosed characteristic of the current model, not a
-   fixture-building error.
-3. A fresh, real `Agent3Report` produced by actually running Agent 3's own committed pipeline
-   (`run_agent3_pipeline`) against artifact (1) — never fabricated or guessed.
+A fresh, real `Agent3Report` is then produced by running Agent 3's own committed pipeline
+(`run_agent3_pipeline`) against that same canonical Agent 2 artifact — never fabricated or
+guessed, and never a separately-regenerated copy: the identical `agent2_model` JSON content
+Agent 3 itself consumes is reused verbatim here, satisfying this project's own compatibility
+requirement that the same Agent 2 artifact parse unmodified in Agents 3, 4, and 5 alike.
 
 No new Agent 1/Agent 2/Agent 3 pipeline run was performed to build this fixture beyond the one
 Agent 3 pipeline execution in step 3; no yeast-specific biological data was added anywhere in

@@ -67,7 +67,7 @@ the produced `ParameterEstimate`s (which given the eligibility check above shoul
 impossible), the pipeline raises `Agent4Error` rather than returning a corrupted report.
 
 Empirically, `fixed=True` is not set on any parameter in the current real `sce00061` model (0 of
-109) — this rule exists for when it is.
+115) — this rule exists for when it is.
 
 ## Initial conditions
 

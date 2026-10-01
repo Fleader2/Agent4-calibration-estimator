@@ -22,12 +22,32 @@ from app.agent4.types import (
     CalibrationTargetType,
     ObservationSet,
 )
+from app.agent4.version import AGENT4_HANDOFF_CONTRACT_VERSION
 from tests.agent4.fixtures import load_real_sce00061_handoff
+
+
+def test_real_handoff_declares_the_one_canonical_contract_version():
+    """Five-Agent Workflow V1 Hardening compatibility check: the real sce00061 ``agent2_model``
+    artifact, as produced by Agent 2's own canonical ``run_agent2_pipeline`` entrypoint, parses
+    successfully and declares exactly the one canonical contract version this repository now
+    expects -- with no re-stamping, no alias, and no per-consumer divergence from what Agent 3
+    also consumes."""
+    data = load_real_sce00061_handoff()
+    assert (
+        data["agent2_model"]["contract_version"]
+        == AGENT4_HANDOFF_CONTRACT_VERSION
+        == "agent2-downstream-v1"
+    )
+    parse_agent4_handoff(data)  # must not raise
 
 
 def test_real_handoff_parses():
     handoff = parse_agent4_handoff(load_real_sce00061_handoff())
-    assert len(handoff.agent2_model.parameters) == 109
+    # Counts reflect Agent 2's own canonical run_agent2_pipeline entrypoint (Five-Agent
+    # Workflow V1 Hardening increment) -- richer than the pre-hardening partial-pipeline
+    # artifact (109 parameters), since the canonical chain now also exercises reaction-context
+    # resolution and enzyme-concentration/enzyme-state-dynamics resolution.
+    assert len(handoff.agent2_model.parameters) == 115
     assert len(handoff.agent2_model.species) == 53
     assert handoff.agent3_diagnostics.overall_status == "STEADY_STATE_NOT_FOUND"
 
@@ -39,7 +59,7 @@ def test_real_heuristic_parameters_are_default_eligible_targets():
         for p in handoff.agent2_model.parameters
         if p.source in DEFAULT_CALIBRATABLE_PARAMETER_SOURCES
     }
-    assert len(heuristic_ids) == 88
+    assert len(heuristic_ids) == 107
     assert heuristic_ids == set(handoff.agent3_diagnostics.heuristic_parameter_ids)
 
     protected_ids = {
@@ -47,10 +67,8 @@ def test_real_heuristic_parameters_are_default_eligible_targets():
         for p in handoff.agent2_model.parameters
         if p.source in PROTECTED_PARAMETER_SOURCES
     }
-    assert (
-        len(protected_ids) == 21
-    )  # 15 AI_PREDICTED + 3 DERIVED_FROM_MACRO_KINETICS + 3 LITERATURE_DERIVED
-    assert len(heuristic_ids) + len(protected_ids) == 109
+    assert len(protected_ids) == 8  # 7 AI_PREDICTED + 1 LITERATURE_DERIVED
+    assert len(heuristic_ids) + len(protected_ids) == 115
 
 
 def test_real_missing_initial_conditions_are_all_53_species():
@@ -75,7 +93,7 @@ def test_real_missing_initial_conditions_are_all_53_species():
 
 
 def test_real_parameters_have_no_agent2_declared_bounds():
-    """Confirms, with real data, that every one of the 109 real parameters has
+    """Confirms, with real data, that every one of the real parameters has
     lower_bound=upper_bound=None -- so calibrating any of them requires the caller to supply
     explicit bounds in the CalibrationRequest itself; Agent 4 never invents a numeric range."""
     handoff = parse_agent4_handoff(load_real_sce00061_handoff())
