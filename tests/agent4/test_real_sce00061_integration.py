@@ -7,7 +7,7 @@ observation merely to obtain a "successful" fit.
 
 **Human-Readable Antimony Naming and Provenance Separation increment:** this fixture
 (``tests/fixtures/sce00061_agent4_handoff.json``) was regenerated from a fresh, real run of
-the same live organism to pick up the new ``antimony_symbol_map``/``agent2-downstream-v2``
+the same live organism to pick up the new ``antimony_symbol_map``/``agent2-downstream-v3``
 fields. The underlying curated data had itself genuinely drifted since this fixture was last
 captured (unrelated curation work in the sibling ``agent1-biochemical-curator`` repository
 between then and now, already disclosed identically in the sibling ``agent3-simulation-
@@ -46,7 +46,7 @@ def test_real_handoff_declares_the_one_canonical_contract_version():
     assert (
         data["agent2_model"]["contract_version"]
         == AGENT4_HANDOFF_CONTRACT_VERSION
-        == "agent2-downstream-v2"
+        == "agent2-downstream-v3"
     )
     parse_agent4_handoff(data)  # must not raise
 

@@ -25,6 +25,16 @@ the sibling repositories.
   entirely: Agent 2's own ``antimony_symbol_map`` field (new in v2) is the one source of truth
   for resolving a handoff entity id to its real, compiled Antimony identifier. See
   ``app.agent4.handoff.Agent2Model.antimony_symbol_map``.
+
+  **Explicit Enzyme Concentration Representation increment (Agent 2):** bumped
+  ``"agent2-downstream-v2"`` -> ``"agent2-downstream-v3"``, mirroring Agent 2's own real bump.
+  Agent 2's handoff ``species[]`` gained ``source_protein_id`` (set only for an explicit
+  catalytic-enzyme species) and ``kinetic_laws[]`` gained ``rate_law_scope``
+  (``"EXPLICIT_ENZYME_CONCENTRATION"``/``"LUMPED_EFFECTIVE_RATE"``) -- both purely additive;
+  this repository's own ``app.agent4.handoff`` parses every species/kinetic-law dict via
+  ``.get(...)`` with no extra-key rejection, so the version bump alone (this repository does
+  not yet read either new field) keeps parsing correct. Consuming them for Agent 4's own
+  calibration-target eligibility is deferred to a future increment.
 * ``ELIGIBILITY_POLICY_VERSION`` -- the version of the calibration-target eligibility policy
   (which provenance classes/initial conditions are calibratable by default, and how explicit
   authorization overrides that).
@@ -38,7 +48,7 @@ the sibling repositories.
 from __future__ import annotations
 
 AGENT4_CONTRACT_VERSION = "0.1"
-AGENT4_HANDOFF_CONTRACT_VERSION = "agent2-downstream-v2"
+AGENT4_HANDOFF_CONTRACT_VERSION = "agent2-downstream-v3"
 ELIGIBILITY_POLICY_VERSION = "eligibility-v1"
 OPTIMIZATION_POLICY_VERSION = "optimization-v1"
 IDENTIFIABILITY_POLICY_VERSION = "identifiability-v1"
