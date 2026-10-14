@@ -94,7 +94,7 @@ def minimal_agent2_model_dict(antimony_text: str, **overrides) -> dict:
     """The smallest valid ``agent2_model`` dict -- callers override ``species``/``parameters``/
     etc. to describe the specific synthetic model they built."""
     base = {
-        "contract_version": "agent2-downstream-v1",
+        "contract_version": "agent2-downstream-v2",
         "model_id": "test-model-1",
         "network_id": "test-network-1",
         "antimony_text": antimony_text,
@@ -166,6 +166,21 @@ def minimal_agent2_model_dict(antimony_text: str, **overrides) -> dict:
         "model_assumptions": [],
     }
     base.update(overrides)
+    # Every synthetic fixture's own species_id/parameter_id is already a valid Antimony
+    # identifier, prefixed exactly as app.agent2.antimony.naming prefixes a GENERATED model's
+    # bare id (no curated biological name in play here) -- derived from whatever
+    # species/parameters ended up in the merged dict (after overrides), never a stale static
+    # default, so an overridden species/parameter list is always resolved correctly.
+    base.setdefault(
+        "antimony_symbol_map",
+        {
+            "species": {s["species_id"]: f"s_{s['species_id']}" for s in base["species"]},
+            "reactions": {},
+            "parameters": {
+                p["parameter_id"]: f"p_{p['parameter_id']}" for p in base["parameters"]
+            },
+        },
+    )
     return base
 
 

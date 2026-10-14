@@ -86,6 +86,8 @@ def evaluate_vector(
         overrides,
         union_times,
         species_id_map=species_id_map,
+        parameter_symbol_map=agent2_model.antimony_symbol_map.parameters,
+        species_symbol_map=agent2_model.antimony_symbol_map.species,
         steady_state_needed=needs_steady_state,
     )
     if not outcome.succeeded:

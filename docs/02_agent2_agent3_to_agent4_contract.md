@@ -10,10 +10,23 @@ project.
 **Five-Agent Workflow V1 Hardening increment:** `agent2_model.contract_version` was previously
 expected to be `"agent2-agent3-to-agent4-v1"` — a name this repository invented independently of
 Agent 3's own `"agent2-to-agent3-v1"`, even though both described the identical real artifact
-shape. It is now `"agent2-downstream-v1"` (`AGENT4_HANDOFF_CONTRACT_VERSION`), the one canonical
+shape. It became `"agent2-downstream-v1"` (`AGENT4_HANDOFF_CONTRACT_VERSION`), the one canonical
 name Agent 2's own `AGENT2_DOWNSTREAM_CONTRACT_VERSION` emits and Agents 3, 4, and 5 all consume
-unchanged. The `agent2_model` shape itself is unchanged by this rename; `agent3_diagnostics`'s
-own shape and the overall two-key wrapping are also unchanged.
+unchanged. The `agent2_model` shape itself was unchanged by that rename; `agent3_diagnostics`'s
+own shape and the overall two-key wrapping were also unchanged.
+
+**Human-Readable Antimony Naming and Provenance Separation increment:** bumped again,
+`"agent2-downstream-v1"` → `"agent2-downstream-v2"`, adding `agent2_model.antimony_symbol_map`
+(see the sibling Agent 3 repository's own contract doc, linked below, for the full field
+description — `agent2_model` stays field-for-field identical to Agent 3's own shape). Agent 2's
+generated Antimony symbols now prefer a curated biological name over a bare id, which this
+repository's own former `app.agent4.antimony_ids` module — an independent re-implementation of
+Agent 2's *old* id-only naming rule — could no longer resolve correctly. That module is removed
+entirely: `app.agent4.simulation.evaluate_candidate` now takes `parameter_symbol_map`/
+`species_symbol_map` arguments (`agent2_model.antimony_symbol_map.parameters`/`.species` directly)
+instead of locally re-deriving a candidate identifier, and `app.agent4.handoff.
+species_antimony_id_map` replaces `app.agent4.antimony_ids.build_species_antimony_id_map` for
+building the reverse (symbol → id) map trajectories are relabeled with.
 
 ## Why two dicts, not one
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from app.agent4.antimony_ids import build_species_antimony_id_map
 from app.agent4.identifiability import (
     bound_hit_findings,
     correlation_findings,
@@ -142,7 +141,7 @@ def test_low_sensitivity_findings_flags_unused_parameter():
         CalibrationTarget(target_kind=CalibrationTargetType.PARAMETER, target_id="k1"),
         CalibrationTarget(target_kind=CalibrationTargetType.PARAMETER, target_id="k2"),
     )
-    id_map = build_species_antimony_id_map(["S1", "S2", "S3"])
+    id_map = {f"s_{sid}": sid for sid in ["S1", "S2", "S3"]}
     bounds = [(0.0, 1.0), (0.0, 1.0)]
     best_vector = np.array([0.5, 0.2])
     from app.agent4.objective import evaluate_vector
@@ -198,7 +197,7 @@ def test_correlation_findings_flags_unidentifiable_pair():
         CalibrationTarget(target_kind=CalibrationTargetType.PARAMETER, target_id="k1"),
         CalibrationTarget(target_kind=CalibrationTargetType.PARAMETER, target_id="k2"),
     )
-    id_map = build_species_antimony_id_map(["S1", "S2"])
+    id_map = {f"s_{sid}": sid for sid in ["S1", "S2"]}
     bounds = [(0.01, 2.0), (0.01, 2.0)]
     best_vector = np.array([UNIDENTIFIABLE_TRUE_PRODUCT, 1.0])
     findings = correlation_findings(handoff.agent2_model, targets, best_vector, bounds, obs, id_map)

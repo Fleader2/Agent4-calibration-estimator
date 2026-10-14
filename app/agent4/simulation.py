@@ -23,7 +23,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from app.agent4.antimony_ids import candidate_parameter_antimony_id, candidate_species_antimony_id
 from app.agent4.loader import load_antimony_model
 
 #: Dense, fixed-resolution simulation grid used for every candidate evaluation -- trajectories
@@ -43,8 +42,8 @@ class CandidateSimulationOutcome:
     """The outcome of simulating one candidate parameter/IC vector.
 
     ``species_trajectories``/``steady_state_values`` are keyed by the **original** Agent 2
-    species id (never the sanitized Antimony identifier) -- resolved via
-    ``app.agent4.antimony_ids`` before being returned, exactly as
+    species id (never the real Antimony identifier) -- resolved via the reverse of Agent 2's
+    own ``antimony_symbol_map`` contract field before being returned, exactly as
     ``app.agent3.simulation``'s own ``id_map`` mechanism does.
     """
 
@@ -55,27 +54,35 @@ class CandidateSimulationOutcome:
     steady_state_values: dict[str, float] | None = None
 
 
-def _resolve_and_apply(rr, overrides: dict[str, float]) -> str | None:
+def _resolve_and_apply(
+    rr,
+    overrides: dict[str, float],
+    *,
+    parameter_symbol_map: dict[str, str],
+    species_symbol_map: dict[str, str],
+) -> str | None:
     """Apply every ``{agent2_entity_id: value}`` override to the freshly-loaded model.
 
-    Tries the parameter-id sanitization first, then the species-id sanitization, for each
-    override key -- an override key is always either a parameter id or a species id, and
-    Agent 4 never guesses which without checking against the model's own real identifiers.
-    Returns ``None`` on success, or a human-readable message naming the first unresolved key.
+    Looks up the parameter-symbol map first, then the species-symbol map, for each override
+    key -- an override key is always either a parameter id or a species id, and Agent 4 never
+    guesses which without checking against the model's own real identifiers. Both maps are
+    Agent 2's own ``antimony_symbol_map`` contract field (Human-Readable Antimony Naming and
+    Provenance Separation increment) -- never a locally re-derived candidate. Returns ``None``
+    on success, or a human-readable message naming the first unresolved key.
     """
     real_parameter_ids = set(rr.model.getGlobalParameterIds())
     real_species_ids = set(rr.model.getFloatingSpeciesIds())
     for entity_id, value in overrides.items():
-        param_candidate = candidate_parameter_antimony_id(entity_id)
-        species_candidate = candidate_species_antimony_id(entity_id)
-        if param_candidate in real_parameter_ids:
+        param_candidate = parameter_symbol_map.get(entity_id)
+        species_candidate = species_symbol_map.get(entity_id)
+        if param_candidate is not None and param_candidate in real_parameter_ids:
             rr[param_candidate] = value
-        elif species_candidate in real_species_ids:
+        elif species_candidate is not None and species_candidate in real_species_ids:
             rr[species_candidate] = value
         else:
             return (
                 f"Could not resolve override target {entity_id!r} against the loaded model "
-                f"(tried parameter id {param_candidate!r} and species id "
+                f"(tried parameter symbol {param_candidate!r} and species symbol "
                 f"{species_candidate!r})."
             )
     return None
@@ -87,6 +94,8 @@ def evaluate_candidate(
     time_points_needed: tuple[float, ...],
     *,
     species_id_map: dict[str, str] | None = None,
+    parameter_symbol_map: dict[str, str] | None = None,
+    species_symbol_map: dict[str, str] | None = None,
     steady_state_needed: bool = False,
 ) -> CandidateSimulationOutcome:
     """Load a fresh model, apply ``overrides``, and simulate it.
@@ -97,11 +106,17 @@ def evaluate_candidate(
     interpolated onto exactly those requested points before being returned.
 
     ``species_id_map`` (``{antimony_species_id: original_agent2_species_id}``, typically
-    ``app.agent4.antimony_ids.build_species_antimony_id_map``'s own output) relabels every
+    ``app.agent4.handoff.species_antimony_id_map``'s own output) relabels every
     trajectory/steady-state key back to the original Agent 2 species id -- without it, keys are
     RoadRunner's own real Antimony identifiers verbatim, which would break provenance tracing
     for a real Agent 2 handoff (see ``app.agent3.simulation``'s own identical ``id_map``
     mechanism and rationale on the sibling repository).
+
+    ``parameter_symbol_map``/``species_symbol_map`` (``{agent2_entity_id: antimony_symbol}``,
+    typically ``agent2_model.antimony_symbol_map.parameters``/``.species`` directly) resolve
+    each ``overrides`` key to the real, compiled Antimony identifier to set -- Agent 2's own
+    data, never a locally re-derived candidate (Human-Readable Antimony Naming and Provenance
+    Separation increment).
     """
     load_result = load_antimony_model(antimony_text)
     if not load_result.succeeded or load_result.roadrunner_instance is None:
@@ -110,7 +125,12 @@ def evaluate_candidate(
     rr = load_result.roadrunner_instance
     species_ids = list(rr.model.getFloatingSpeciesIds())
     id_map = species_id_map or {}
-    resolution_error = _resolve_and_apply(rr, overrides)
+    resolution_error = _resolve_and_apply(
+        rr,
+        overrides,
+        parameter_symbol_map=parameter_symbol_map or {},
+        species_symbol_map=species_symbol_map or {},
+    )
     if resolution_error is not None:
         return CandidateSimulationOutcome(succeeded=False, message=resolution_error)
 

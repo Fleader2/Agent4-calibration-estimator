@@ -16,10 +16,9 @@ import uuid
 
 import numpy as np
 
-from app.agent4.antimony_ids import build_species_antimony_id_map
 from app.agent4.eligibility import resolve_bounds, validate_request
 from app.agent4.errors import Agent4Error
-from app.agent4.handoff import Agent2Model, Agent4Handoff
+from app.agent4.handoff import Agent2Model, Agent4Handoff, species_antimony_id_map
 from app.agent4.identifiability import (
     bound_hit_findings,
     correlation_findings,
@@ -153,7 +152,7 @@ def run_agent4_pipeline(handoff: Agent4Handoff, request: CalibrationRequest) -> 
     targets = request.targets
     bounds_by_target = [resolve_bounds(t, agent2_model) for t in targets]
     bounds_list = [(b.lower, b.upper) for b in bounds_by_target]
-    species_id_map = build_species_antimony_id_map([s.species_id for s in agent2_model.species])
+    species_id_map = species_antimony_id_map(agent2_model)
 
     train_obs = tuple(
         o for o in request.observations.observations if o.partition is ObservationPartition.TRAIN

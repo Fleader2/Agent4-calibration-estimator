@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from app.agent4.antimony_ids import build_species_antimony_id_map
 from app.agent4.objective import PENALTY_OBJECTIVE_VALUE, evaluate_vector
 from app.agent4.types import (
     CalibrationTarget,
@@ -38,7 +37,7 @@ def test_exact_match_gives_zero_objective():
         time_points=time_points,
         values=values,
     )
-    id_map = build_species_antimony_id_map(["S1"])
+    id_map = {f"s_{sid}": sid for sid in ["S1"]}
     result = evaluate_vector(
         handoff.agent2_model, _target(), np.array([ONE_PARAMETER_TRUE_K]), (obs,), id_map
     )
@@ -57,7 +56,7 @@ def test_wrong_value_gives_positive_objective():
         time_points=time_points,
         values=values,
     )
-    id_map = build_species_antimony_id_map(["S1"])
+    id_map = {f"s_{sid}": sid for sid in ["S1"]}
     result = evaluate_vector(handoff.agent2_model, _target(), np.array([0.1]), (obs,), id_map)
     assert result.succeeded
     assert result.objective > 1.0
@@ -66,7 +65,7 @@ def test_wrong_value_gives_positive_objective():
 def test_sigma_weighting_scales_objective():
     handoff = parsed_handoff(minimal_agent2_model_dict(ONE_PARAMETER_ANTIMONY))
     time_points, values = simulate_truth(ONE_PARAMETER_ANTIMONY, "s_S1", end_time=5, num_points=6)
-    id_map = build_species_antimony_id_map(["S1"])
+    id_map = {f"s_{sid}": sid for sid in ["S1"]}
 
     unweighted = Observation(
         observation_id="o1",
@@ -104,7 +103,7 @@ def test_invalid_antimony_returns_penalty_not_exception():
         time_points=(0.0, 1.0),
         values=(10.0, 5.0),
     )
-    id_map = build_species_antimony_id_map(["S1"])
+    id_map = {f"s_{sid}": sid for sid in ["S1"]}
     result = evaluate_vector(handoff.agent2_model, _target(), np.array([0.1]), (obs,), id_map)
     assert not result.succeeded
     assert result.objective == PENALTY_OBJECTIVE_VALUE
@@ -120,7 +119,7 @@ def test_steady_state_observation_objective():
         time_points=(),
         values=(0.0,),
     )
-    id_map = build_species_antimony_id_map(["S1"])
+    id_map = {f"s_{sid}": sid for sid in ["S1"]}
     result = evaluate_vector(
         handoff.agent2_model, _target(), np.array([ONE_PARAMETER_TRUE_K]), (obs,), id_map
     )
@@ -139,7 +138,7 @@ def test_prior_penalty_added_when_configured():
         time_points=time_points,
         values=values,
     )
-    id_map = build_species_antimony_id_map(["S1"])
+    id_map = {f"s_{sid}": sid for sid in ["S1"]}
     target_with_prior = (
         CalibrationTarget(
             target_kind=CalibrationTargetType.PARAMETER,

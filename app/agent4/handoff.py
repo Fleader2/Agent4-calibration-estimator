@@ -179,6 +179,61 @@ class Agent4ModelAssumption:
 
 
 @dataclass(frozen=True, slots=True)
+class AntimonySymbolMap:
+    """Agent 2's own exact canonical-id -> real, compiled Antimony-symbol mapping (Human-
+    Readable Antimony Naming and Provenance Separation increment, contract v2).
+
+    Antimony symbol assignment is Agent 2-owned data: Agent 2's naming rule
+    (``app.agent2.antimony.naming``) depends on curated biological names only Agent 2 has
+    access to, so a symbol can never be correctly re-derived from a bare handoff entity id.
+    This replaces this repository's former ``app.agent4.antimony_ids`` module, which
+    independently re-implemented Agent 2's *old* id-only naming rule and silently broke the
+    moment that rule changed -- Agent 4 now reads the real mapping directly instead.
+
+    Missing from a v1 handoff: defaults to three empty dicts, never raises -- mirrors this
+    contract's own established "version mismatch is disclosed, not raised" discipline.
+    """
+
+    species: dict[str, str]
+    reactions: dict[str, str]
+    parameters: dict[str, str]
+
+
+def _parse_antimony_symbol_map(value: object, *, field: str) -> AntimonySymbolMap:
+    if value is None:
+        return AntimonySymbolMap(species={}, reactions={}, parameters={})
+    if not isinstance(value, dict):
+        raise HandoffContractError(f"{field} must be an object, got {value!r}")
+
+    def _str_dict(sub: object, *, sub_field: str) -> dict[str, str]:
+        if sub is None:
+            return {}
+        if not isinstance(sub, dict) or any(
+            not isinstance(k, str) or not isinstance(v, str) for k, v in sub.items()
+        ):
+            raise HandoffContractError(
+                f"{sub_field} must be an object of string -> string, got {sub!r}"
+            )
+        return dict(sub)
+
+    return AntimonySymbolMap(
+        species=_str_dict(value.get("species"), sub_field=f"{field}.species"),
+        reactions=_str_dict(value.get("reactions"), sub_field=f"{field}.reactions"),
+        parameters=_str_dict(value.get("parameters"), sub_field=f"{field}.parameters"),
+    )
+
+
+def species_antimony_id_map(agent2_model: Agent2Model) -> dict[str, str]:
+    """``{antimony_species_symbol: original_agent2_species_id}`` -- the reverse of
+    ``agent2_model.antimony_symbol_map.species``, in exactly the shape
+    ``app.agent4.simulation``'s own ``id_map`` parameter expects."""
+    return {
+        symbol: species_id
+        for species_id, symbol in agent2_model.antimony_symbol_map.species.items()
+    }
+
+
+@dataclass(frozen=True, slots=True)
 class Agent2Model:
     """The Agent 2 half of the Agent 4 handoff: the compilable model plus every
     structural/provenance fact needed to select and bound a calibration target."""
@@ -188,6 +243,7 @@ class Agent2Model:
     network_id: str
     antimony_text: str
     antimony_generator_version: str
+    antimony_symbol_map: AntimonySymbolMap
     readiness: str
     unresolved_reaction_ids: tuple[str, ...]
     unresolved_kinetic_law_ids: tuple[str, ...]
@@ -419,6 +475,9 @@ def _parse_agent2_model(data: dict) -> Agent2Model:
             data.get("antimony_generator_version"),
             field="agent2_model.antimony_generator_version",
         ),
+        antimony_symbol_map=_parse_antimony_symbol_map(
+            data.get("antimony_symbol_map"), field="agent2_model.antimony_symbol_map"
+        ),
         readiness=_require_str(data.get("readiness"), field="agent2_model.readiness"),
         unresolved_reaction_ids=_str_tuple(
             data.get("unresolved_reaction_ids"), field="agent2_model.unresolved_reaction_ids"
@@ -546,6 +605,8 @@ __all__ = [
     "Agent4Participant",
     "Agent4Reaction",
     "Agent4Species",
+    "AntimonySymbolMap",
     "handoff_contract_version_note",
     "parse_agent4_handoff",
+    "species_antimony_id_map",
 ]

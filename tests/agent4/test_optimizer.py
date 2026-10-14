@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from app.agent4.antimony_ids import build_species_antimony_id_map
 from app.agent4.optimizer import generate_start_vectors, run_multistart_optimization
 from app.agent4.types import (
     CalibrationTarget,
@@ -61,7 +60,7 @@ def test_multistart_recovers_true_parameter():
         ),
     )
     targets = (CalibrationTarget(target_kind=CalibrationTargetType.PARAMETER, target_id="k1"),)
-    id_map = build_species_antimony_id_map(["S1"])
+    id_map = {f"s_{sid}": sid for sid in ["S1"]}
     results = run_multistart_optimization(
         handoff.agent2_model,
         targets,

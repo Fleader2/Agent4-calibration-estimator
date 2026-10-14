@@ -16,6 +16,15 @@ the sibling repositories.
   for what was already the identical real ``agent2_model`` artifact shape Agent 3 consumes. Not
   a guarantee that every upstream contract version is compatible -- version reconciliation is
   deferred, exactly as the Agent 1 -> Agent 2 and Agent 2 -> Agent 3 boundaries' own precedent.
+
+  **Human-Readable Antimony Naming and Provenance Separation increment (Agent 2):** bumped
+  ``"agent2-downstream-v1"`` -> ``"agent2-downstream-v2"``. Agent 2's generated Antimony
+  symbols now prefer a curated biological name over a bare id, which this repository's own
+  former ``app.agent4.antimony_ids`` module -- an independent re-implementation of Agent 2's
+  *old* id-only naming rule -- could no longer resolve correctly. That module is removed
+  entirely: Agent 2's own ``antimony_symbol_map`` field (new in v2) is the one source of truth
+  for resolving a handoff entity id to its real, compiled Antimony identifier. See
+  ``app.agent4.handoff.Agent2Model.antimony_symbol_map``.
 * ``ELIGIBILITY_POLICY_VERSION`` -- the version of the calibration-target eligibility policy
   (which provenance classes/initial conditions are calibratable by default, and how explicit
   authorization overrides that).
@@ -29,7 +38,7 @@ the sibling repositories.
 from __future__ import annotations
 
 AGENT4_CONTRACT_VERSION = "0.1"
-AGENT4_HANDOFF_CONTRACT_VERSION = "agent2-downstream-v1"
+AGENT4_HANDOFF_CONTRACT_VERSION = "agent2-downstream-v2"
 ELIGIBILITY_POLICY_VERSION = "eligibility-v1"
 OPTIMIZATION_POLICY_VERSION = "optimization-v1"
 IDENTIFIABILITY_POLICY_VERSION = "identifiability-v1"
