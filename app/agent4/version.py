@@ -43,11 +43,23 @@ the sibling repositories.
 * ``IDENTIFIABILITY_POLICY_VERSION`` -- the version of the practical-identifiability diagnostic
   rule set (bound-hit, weak-sensitivity, correlation, multi-start-flatness, insufficient-data
   thresholds).
+
+**Calibration Evidence Integration into Weight-Space Exploration increment (cross-repo):**
+``AGENT4_CONTRACT_VERSION`` bumped ``"0.1"`` -> ``"0.2"``. Purely additive: ``ParameterEstimate``
+gained ``standard_error`` and ``CalibrationResult`` gained ``parameter_correlations`` (a new
+``ParameterCorrelation`` type) -- both expose a local, approximate covariance estimate this
+repository's own ``app.agent4.identifiability.correlation_findings`` already computed
+internally (only to threshold-check its own ``HIGH_CORRELATION`` finding) but previously
+discarded; no new calibration algorithm, no change to any existing finding/status/threshold
+behavior. ``IDENTIFIABILITY_POLICY_VERSION`` is unchanged -- the rule set producing findings is
+byte-identical; only new, additional fields were exposed alongside it. A downstream consumer
+parsing via ``.get(...)`` (every sibling repository's own established convention) is
+unaffected by either new field.
 """
 
 from __future__ import annotations
 
-AGENT4_CONTRACT_VERSION = "0.1"
+AGENT4_CONTRACT_VERSION = "0.2"
 AGENT4_HANDOFF_CONTRACT_VERSION = "agent2-downstream-v3"
 ELIGIBILITY_POLICY_VERSION = "eligibility-v1"
 OPTIMIZATION_POLICY_VERSION = "optimization-v1"

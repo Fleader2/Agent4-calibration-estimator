@@ -98,3 +98,27 @@ disagree about what "the run's status" means):
 A `SUCCESS` status means the optimizer converged, the objective improved, and none of Version
 1's own modest checks found a reason for concern — it is not, and is never presented as, a
 guarantee of correctness beyond what these five specific checks can see.
+
+## 6. Public exposure of the underlying local covariance estimate (Calibration Evidence
+Integration into Weight-Space Exploration increment)
+
+`correlation_findings` always computed a local covariance estimate (finite-difference residual
+Jacobian → Fisher information → pseudo-inverse) to threshold-check `HIGH_CORRELATION`, but
+discarded everything except the findings that crossed `_HIGH_CORRELATION_THRESHOLD`. That same
+computation is now also returned as structured data, computed once and shared (never twice):
+
+- `app.agent4.identifiability.local_covariance_estimate(...)` returns a
+  `LocalCovarianceEstimate` (`target_ids`, `standard_errors`, `correlations` — **every** pair,
+  not only the high ones) or `None` when it could not be computed.
+- `ParameterEstimate.standard_error` (new field) — this target's own entry from
+  `standard_errors`, or `None` when the estimate itself could not be computed.
+- `CalibrationResult.parameter_correlations` (new field, `tuple[ParameterCorrelation, ...]`) —
+  every fitted-target pair's own local correlation, or empty under the same condition.
+
+This is explicitly **not** a rigorous, noise-propagated statistical standard error (no
+residual-variance rescaling is applied) — it remains exactly what `correlation_findings`
+already was: a local, approximate, practical heuristic at the fitted optimum, never a formal
+identifiability proof. No new calibration algorithm was introduced; existing internal
+computation is simply no longer discarded. `AGENT4_CONTRACT_VERSION` bumped `"0.1"` → `"0.2"`
+(purely additive — a downstream consumer parsing via `.get(...)`, the established convention
+on every sibling repository, is unaffected by either new field).

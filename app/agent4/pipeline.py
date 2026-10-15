@@ -25,6 +25,7 @@ from app.agent4.identifiability import (
     degenerate_objective_findings,
     insufficient_observations_finding,
     is_at_bound,
+    local_covariance_estimate,
     low_sensitivity_findings,
 )
 from app.agent4.objective import evaluate_vector, weights_for_observation
@@ -41,6 +42,7 @@ from app.agent4.types import (
     IdentifiabilityCategory,
     IdentifiabilitySeverity,
     ObservationPartition,
+    ParameterCorrelation,
     ParameterEstimate,
     ResidualSummary,
 )
@@ -220,6 +222,19 @@ def run_agent4_pipeline(handoff: Agent4Handoff, request: CalibrationRequest) -> 
     best_vector = np.array(best_result.final_vector)
     objective_after = best_result.objective
 
+    # Computed once, reused for both ParameterEstimate.standard_error/CalibrationResult
+    # .parameter_correlations below and correlation_findings' own HIGH_CORRELATION
+    # threshold check further down -- the identical Jacobian/Fisher-information computation,
+    # never performed twice.
+    covariance_estimate = local_covariance_estimate(
+        agent2_model, targets, best_vector, bounds_list, train_obs, species_id_map
+    )
+    standard_errors_by_target = (
+        dict(zip(covariance_estimate.target_ids, covariance_estimate.standard_errors, strict=True))
+        if covariance_estimate is not None
+        else {}
+    )
+
     parameter_estimates = []
     for target, orig_value, bound, value in zip(
         targets, originals, bounds_by_target, best_vector, strict=True
@@ -237,6 +252,7 @@ def run_agent4_pipeline(handoff: Agent4Handoff, request: CalibrationRequest) -> 
                 at_lower_bound=at_lower,
                 at_upper_bound=at_upper,
                 provenance_refs=(request.observations.observation_set_id, calibration_run_id),
+                standard_error=standard_errors_by_target.get(target.target_id),
             )
         )
 
@@ -289,7 +305,13 @@ def run_agent4_pipeline(handoff: Agent4Handoff, request: CalibrationRequest) -> 
     )
     findings.extend(
         correlation_findings(
-            agent2_model, targets, best_vector, bounds_list, train_obs, species_id_map
+            agent2_model,
+            targets,
+            best_vector,
+            bounds_list,
+            train_obs,
+            species_id_map,
+            precomputed=covariance_estimate,
         )
     )
     findings.extend(degenerate_objective_findings(start_results, bounds_list))
@@ -308,6 +330,14 @@ def run_agent4_pipeline(handoff: Agent4Handoff, request: CalibrationRequest) -> 
     else:
         status = CalibrationStatus.SUCCESS
 
+    parameter_correlations = (
+        tuple(
+            ParameterCorrelation(target_id_a=a, target_id_b=b, correlation=corr)
+            for a, b, corr in covariance_estimate.correlations
+        )
+        if covariance_estimate is not None
+        else ()
+    )
     calibration = CalibrationResult(
         calibration_run_id=calibration_run_id,
         status=status,
@@ -320,6 +350,7 @@ def run_agent4_pipeline(handoff: Agent4Handoff, request: CalibrationRequest) -> 
         n_multistarts=len(start_results),
         best_start_index=best_index,
         all_start_objectives=all_start_objectives,
+        parameter_correlations=parameter_correlations,
     )
     return _build_report(report_id, handoff, request, calibration, fixed_parameter_ids)
 

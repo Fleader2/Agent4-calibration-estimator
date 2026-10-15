@@ -100,6 +100,17 @@ def test_one_parameter_recovery():
     assert report.calibration.objective_after < report.calibration.objective_before
 
 
+def test_one_parameter_estimate_exposes_standard_error():
+    """Calibration Evidence Integration into Weight-Space Exploration increment: a single,
+    well-fit target's own local standard error is exposed (never fabricated) even though no
+    correlation pair exists with only one target."""
+    report, _, _ = _one_parameter_report()
+    estimate = report.calibration.parameter_estimates[0]
+    assert estimate.standard_error is not None
+    assert estimate.standard_error >= 0
+    assert report.calibration.parameter_correlations == ()
+
+
 # --- 2. two-parameter identifiable recovery ------------------------------------------------
 
 
@@ -232,6 +243,16 @@ def test_deliberately_unidentifiable_model_flagged():
         report.calibration.status is CalibrationStatus.UNIDENTIFIABLE
         or "HIGH_CORRELATION" in categories
     )
+    # Calibration Evidence Integration into Weight-Space Exploration increment: the same local
+    # correlation estimate behind any HIGH_CORRELATION finding is also exposed as structured
+    # data -- both parameters' own standard errors, and the k1/k2 pair's own correlation.
+    estimates_by_target = {e.target_id: e for e in report.calibration.parameter_estimates}
+    assert estimates_by_target["k1"].standard_error is not None
+    assert estimates_by_target["k2"].standard_error is not None
+    assert len(report.calibration.parameter_correlations) == 1
+    pair = report.calibration.parameter_correlations[0]
+    assert {pair.target_id_a, pair.target_id_b} == {"k1", "k2"}
+    assert abs(pair.correlation) >= 0.95
 
 
 # --- 4. missing initial condition fitted successfully ---------------------------------------

@@ -219,6 +219,14 @@ class ParameterEstimate:
     at_upper_bound: bool
     new_source: str = "CALIBRATED"
     provenance_refs: tuple[str, ...] = ()
+    #: Calibration Evidence Integration into Weight-Space Exploration increment: this target's
+    #: own local, approximate standard error (``sqrt`` of the Fisher-information-pseudo-inverse
+    #: covariance diagonal at the fitted optimum) -- the identical computation
+    #: ``app.agent4.identifiability.correlation_findings`` already performed internally,
+    #: now also exposed as public data rather than discarded. ``None`` whenever that local
+    #: covariance estimate itself could not be computed (fewer than one target, or a finite-
+    #: difference evaluation along the way failed to simulate) -- never fabricated.
+    standard_error: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,6 +258,19 @@ class IdentifiabilityFinding:
 
 
 @dataclass(frozen=True, slots=True)
+class ParameterCorrelation:
+    """One pair of fitted targets' own local, approximate correlation at the fitted optimum --
+    the identical computation ``app.agent4.identifiability.correlation_findings`` already
+    performed internally to threshold-check its own ``HIGH_CORRELATION`` finding, now also
+    exposed as structured data for **every** pair (not only those above that finding's own
+    threshold) -- never a new calibration algorithm, never recomputed differently here."""
+
+    target_id_a: str
+    target_id_b: str
+    correlation: float
+
+
+@dataclass(frozen=True, slots=True)
 class CalibrationResult:
     """The full outcome of one optimization run: before/after objective, every parameter
     estimate, every residual summary, and every identifiability finding."""
@@ -265,6 +286,11 @@ class CalibrationResult:
     n_multistarts: int
     best_start_index: int | None
     all_start_objectives: tuple[float, ...]
+    #: Calibration Evidence Integration into Weight-Space Exploration increment: every fitted
+    #: target pair's own local correlation (``app.agent4.identifiability
+    #: .local_covariance_estimate``'s own output) -- empty whenever fewer than two targets were
+    #: fit, or that local covariance estimate itself could not be computed. Never fabricated.
+    parameter_correlations: tuple[ParameterCorrelation, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,6 +325,7 @@ __all__ = [
     "ObservationPartition",
     "ObservationSet",
     "OptimizerConfig",
+    "ParameterCorrelation",
     "ParameterEstimate",
     "ResidualSummary",
 ]

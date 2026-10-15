@@ -9,6 +9,8 @@ establish.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from app.agent4.handoff import Agent2Model
@@ -180,6 +182,83 @@ def _finite_difference_jacobian(
     return np.column_stack(columns)
 
 
+@dataclass(frozen=True, slots=True)
+class LocalCovarianceEstimate:
+    """One local, approximate covariance estimate at the fitted optimum (Fisher-information
+    pseudo-inverse of the finite-difference residual Jacobian) -- the identical computation
+    ``correlation_findings`` has always performed internally to threshold-check
+    ``HIGH_CORRELATION``, now also returned as structured data (Calibration Evidence
+    Integration into Weight-Space Exploration increment, task instructions §3: "expose useful
+    calibration-quality fields ... where already available internally"). Never a formal
+    structural-identifiability proof, and never a new calibration algorithm -- this is the
+    exact same math ``correlation_findings`` already ran, merely no longer discarded.
+
+    ``standard_errors`` is aligned, index-for-index, with ``target_ids`` (``sqrt`` of the
+    covariance diagonal -- a local curvature-based approximation, not a rigorous noise-
+    propagated statistical standard error, since no residual-variance rescaling is applied;
+    see this module's own top-level docstring on "local, approximate, practical" diagnostics).
+    ``correlations`` holds **every** pair (not only those above ``_HIGH_CORRELATION_THRESHOLD``)
+    as ``(target_id_i, target_id_j, correlation)`` with ``i < j`` in ``target_ids``' own order.
+    """
+
+    target_ids: tuple[str, ...]
+    standard_errors: tuple[float, ...]
+    correlations: tuple[tuple[str, str, float], ...]
+
+
+def _local_covariance(
+    agent2_model: Agent2Model,
+    targets: tuple[CalibrationTarget, ...],
+    best_vector: np.ndarray,
+    bounds: list[tuple[float, float]],
+    train_observations: tuple[Observation, ...],
+    species_id_map: dict[str, str],
+) -> LocalCovarianceEstimate | None:
+    if not targets:
+        return None
+    jacobian = _finite_difference_jacobian(
+        agent2_model, targets, best_vector, bounds, train_observations, species_id_map
+    )
+    if jacobian is None:
+        return None
+    fisher_information = jacobian.T @ jacobian
+    try:
+        covariance = np.linalg.pinv(fisher_information)
+    except np.linalg.LinAlgError:  # pragma: no cover - pinv itself rarely raises
+        return None
+
+    diag = np.sqrt(np.clip(np.diag(covariance), 1e-300, None))
+    correlations: list[tuple[str, str, float]] = []
+    for i in range(len(targets)):
+        for j in range(i + 1, len(targets)):
+            denom = diag[i] * diag[j]
+            if denom <= 0:
+                continue
+            corr = float(covariance[i, j] / denom)
+            correlations.append((targets[i].target_id, targets[j].target_id, corr))
+    return LocalCovarianceEstimate(
+        target_ids=tuple(t.target_id for t in targets),
+        standard_errors=tuple(float(d) for d in diag),
+        correlations=tuple(correlations),
+    )
+
+
+def local_covariance_estimate(
+    agent2_model: Agent2Model,
+    targets: tuple[CalibrationTarget, ...],
+    best_vector: np.ndarray,
+    bounds: list[tuple[float, float]],
+    train_observations: tuple[Observation, ...],
+    species_id_map: dict[str, str],
+) -> LocalCovarianceEstimate | None:
+    """Public entry point for the shared covariance computation ``correlation_findings`` (and
+    ``app.agent4.pipeline``, for public-output exposure) both rely on -- computed once, reused
+    for both purposes, never duplicated work."""
+    return _local_covariance(
+        agent2_model, targets, best_vector, bounds, train_observations, species_id_map
+    )
+
+
 def correlation_findings(
     agent2_model: Agent2Model,
     targets: tuple[CalibrationTarget, ...],
@@ -187,49 +266,44 @@ def correlation_findings(
     bounds: list[tuple[float, float]],
     train_observations: tuple[Observation, ...],
     species_id_map: dict[str, str],
+    *,
+    precomputed: LocalCovarianceEstimate | None = None,
 ) -> tuple[IdentifiabilityFinding, ...]:
+    """``precomputed`` (optional, defaults to ``None``) lets a caller that already computed its
+    own ``local_covariance_estimate`` pass it in directly, avoiding a second, identical
+    Jacobian/Fisher-information computation -- omitting it reproduces this function's exact
+    pre-existing behavior with no change whatsoever."""
     if len(targets) < 2:
         return ()
-    jacobian = _finite_difference_jacobian(
+    estimate = precomputed if precomputed is not None else _local_covariance(
         agent2_model, targets, best_vector, bounds, train_observations, species_id_map
     )
-    if jacobian is None:
-        return ()
-    fisher_information = jacobian.T @ jacobian
-    try:
-        covariance = np.linalg.pinv(fisher_information)
-    except np.linalg.LinAlgError:  # pragma: no cover - pinv itself rarely raises
+    if estimate is None:
         return ()
 
-    diag = np.sqrt(np.clip(np.diag(covariance), 1e-300, None))
     findings = []
-    for i in range(len(targets)):
-        for j in range(i + 1, len(targets)):
-            denom = diag[i] * diag[j]
-            if denom <= 0:
-                continue
-            corr = covariance[i, j] / denom
-            if abs(corr) >= _HIGH_CORRELATION_THRESHOLD:
-                findings.append(
-                    IdentifiabilityFinding(
-                        finding_id=f"high-correlation:{targets[i].target_id}:{targets[j].target_id}",
-                        category=IdentifiabilityCategory.HIGH_CORRELATION,
-                        severity=IdentifiabilitySeverity.ERROR,
-                        summary=(
-                            f"Targets {targets[i].target_id!r} and {targets[j].target_id!r} "
-                            f"have an estimated local correlation of {corr:.3f}."
-                        ),
-                        explanation=(
-                            "A local linearization (finite-difference Jacobian of the residual "
-                            "vector at the fitted optimum) suggests these two targets are "
-                            "practically indistinguishable from the supplied observations -- "
-                            "only some combination of them, not their individual values, is "
-                            "actually constrained by the data. This is a local approximation, "
-                            "never a formal structural-identifiability proof."
-                        ),
-                        related_target_ids=(targets[i].target_id, targets[j].target_id),
-                    )
+    for target_id_i, target_id_j, corr in estimate.correlations:
+        if abs(corr) >= _HIGH_CORRELATION_THRESHOLD:
+            findings.append(
+                IdentifiabilityFinding(
+                    finding_id=f"high-correlation:{target_id_i}:{target_id_j}",
+                    category=IdentifiabilityCategory.HIGH_CORRELATION,
+                    severity=IdentifiabilitySeverity.ERROR,
+                    summary=(
+                        f"Targets {target_id_i!r} and {target_id_j!r} have an estimated local "
+                        f"correlation of {corr:.3f}."
+                    ),
+                    explanation=(
+                        "A local linearization (finite-difference Jacobian of the residual "
+                        "vector at the fitted optimum) suggests these two targets are "
+                        "practically indistinguishable from the supplied observations -- "
+                        "only some combination of them, not their individual values, is "
+                        "actually constrained by the data. This is a local approximation, "
+                        "never a formal structural-identifiability proof."
+                    ),
+                    related_target_ids=(target_id_i, target_id_j),
                 )
+            )
     return tuple(findings)
 
 
@@ -303,10 +377,12 @@ def insufficient_observations_finding(
 
 
 __all__ = [
+    "LocalCovarianceEstimate",
     "bound_hit_findings",
     "correlation_findings",
     "degenerate_objective_findings",
     "insufficient_observations_finding",
     "is_at_bound",
+    "local_covariance_estimate",
     "low_sensitivity_findings",
 ]

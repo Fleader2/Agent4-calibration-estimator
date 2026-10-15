@@ -10,6 +10,7 @@ from app.agent4.identifiability import (
     degenerate_objective_findings,
     insufficient_observations_finding,
     is_at_bound,
+    local_covariance_estimate,
     low_sensitivity_findings,
 )
 from app.agent4.optimizer import StartResult
@@ -203,3 +204,95 @@ def test_correlation_findings_flags_unidentifiable_pair():
     findings = correlation_findings(handoff.agent2_model, targets, best_vector, bounds, obs, id_map)
     assert len(findings) == 1
     assert findings[0].category is IdentifiabilityCategory.HIGH_CORRELATION
+
+
+def _unidentifiable_fixture():
+    model_dict = minimal_agent2_model_dict(
+        UNIDENTIFIABLE_ANTIMONY,
+        species=[
+            {
+                "species_id": "S1",
+                "name": "S1",
+                "compartment_id": "C",
+                "initial_concentration": "10",
+            },
+            {
+                "species_id": "S2",
+                "name": "S2",
+                "compartment_id": "C",
+                "initial_concentration": "0",
+            },
+        ],
+        parameters=[
+            {
+                "parameter_id": "k1",
+                "name": "k1",
+                "source": "HEURISTIC_INITIALIZATION",
+                "value": str(UNIDENTIFIABLE_TRUE_PRODUCT),
+            },
+            {
+                "parameter_id": "k2",
+                "name": "k2",
+                "source": "HEURISTIC_INITIALIZATION",
+                "value": "1.0",
+            },
+        ],
+    )
+    handoff = parsed_handoff(model_dict)
+    time_points, values = simulate_truth(UNIDENTIFIABLE_ANTIMONY, "s_S1", end_time=5, num_points=6)
+    obs = (
+        Observation(
+            observation_id="o1",
+            target_species_id="S1",
+            kind=ObservationKind.TIME_SERIES,
+            partition=ObservationPartition.TRAIN,
+            time_points=time_points,
+            values=values,
+        ),
+    )
+    targets = (
+        CalibrationTarget(target_kind=CalibrationTargetType.PARAMETER, target_id="k1"),
+        CalibrationTarget(target_kind=CalibrationTargetType.PARAMETER, target_id="k2"),
+    )
+    id_map = {f"s_{sid}": sid for sid in ["S1", "S2"]}
+    bounds = [(0.01, 2.0), (0.01, 2.0)]
+    best_vector = np.array([UNIDENTIFIABLE_TRUE_PRODUCT, 1.0])
+    return handoff, targets, best_vector, bounds, obs, id_map
+
+
+def test_local_covariance_estimate_exposes_standard_errors_and_every_pair():
+    handoff, targets, best_vector, bounds, obs, id_map = _unidentifiable_fixture()
+    estimate = local_covariance_estimate(
+        handoff.agent2_model, targets, best_vector, bounds, obs, id_map
+    )
+    assert estimate is not None
+    assert estimate.target_ids == ("k1", "k2")
+    assert len(estimate.standard_errors) == 2
+    assert all(se >= 0 for se in estimate.standard_errors)
+    # Every pair is present, not only those above the HIGH_CORRELATION threshold.
+    assert len(estimate.correlations) == 1
+    target_id_a, target_id_b, corr = estimate.correlations[0]
+    assert (target_id_a, target_id_b) == ("k1", "k2")
+    assert abs(corr) >= 0.95  # the same pair correlation_findings flags as HIGH_CORRELATION
+
+
+def test_correlation_findings_with_precomputed_estimate_matches_recomputed():
+    handoff, targets, best_vector, bounds, obs, id_map = _unidentifiable_fixture()
+    estimate = local_covariance_estimate(
+        handoff.agent2_model, targets, best_vector, bounds, obs, id_map
+    )
+    recomputed = correlation_findings(
+        handoff.agent2_model, targets, best_vector, bounds, obs, id_map
+    )
+    precomputed = correlation_findings(
+        handoff.agent2_model, targets, best_vector, bounds, obs, id_map, precomputed=estimate
+    )
+    assert recomputed == precomputed
+
+
+def test_local_covariance_estimate_none_for_zero_targets():
+    handoff, _targets, best_vector, bounds, obs, id_map = _unidentifiable_fixture()
+    estimate = local_covariance_estimate(
+        handoff.agent2_model, (), best_vector, bounds, obs, id_map
+    )
+    assert estimate is None

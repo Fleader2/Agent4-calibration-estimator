@@ -35,6 +35,12 @@ See `docs/01_agent4_responsibility_boundary.md`, `docs/02_agent2_agent3_to_agent
 `docs/03_calibration_target_eligibility_policy.md`, `docs/04_provenance_semantics.md`, and
 `docs/05_identifiability_diagnostics.md` for full detail.
 
+**Calibration Evidence Integration into Weight-Space Exploration increment** (cross-repo,
+`AGENT4_CONTRACT_VERSION` `"0.1"` → `"0.2"`): `ParameterEstimate.standard_error` and
+`CalibrationResult.parameter_correlations` now expose a local covariance estimate Agent 4
+already computed internally (only to threshold-check its own `HIGH_CORRELATION` finding) —
+purely additive, no new calibration algorithm. See `docs/05_identifiability_diagnostics.md` §6.
+
 ## Canonical workflow
 
 ```text
